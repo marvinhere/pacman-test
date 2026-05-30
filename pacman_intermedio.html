@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pac-Man Intermedio</title>
+<style>
+body{background:#000;color:#fff;font-family:Arial;text-align:center;margin:0}
+h1{color:#ff0}
+#ui{padding:10px}
+canvas{background:#000;border:3px solid #1e90ff}
+button{padding:8px 16px;margin:4px}
+</style>
+</head>
+<body>
+<h1>Pac‑Man Intermedio</h1>
+<div id="ui">
+<span id="score">Puntos: 0</span>
+<span id="lives" style="margin-left:20px">Vidas: 3</span><br>
+<button id="start">Iniciar</button>
+<button id="restart">Reiniciar</button>
+</div>
+<canvas id="game" width="608" height="416"></canvas>
+<script>
+const c=document.getElementById('game'),ctx=c.getContext('2d');
+const T=32;
+const map=[
+"###################",
+"#o........#......o#",
+"#.###.##..#..##.###",
+"#.................#",
+"#.###.#.###.#.###.#",
+"#.....#..F#.#.....#",
+"###.#.###.#.###.#.#",
+"#.................#",
+"#.###.#.###.#.###.#",
+"#o....#...#.#....o#",
+"#.#########.#####.#",
+"#.................#",
+"###################"];
+let score=0,lives=3,started=false,power=0,mouth=0;
+const player={x:1,y:1,dx:0,dy:0};
+const ghosts=[
+{x:17,y:1,c:'red'},
+{x:17,y:11,c:'pink'},
+{x:1,y:11,c:'cyan'},
+{x:9,y:6,c:'orange'}
+];
+let pellets=[]; let fruit=null;
+function resetBoard(){
+ pellets=[]; fruit=null;
+ map.forEach((r,y)=>[...r].forEach((ch,x)=>{
+  if(ch=='.'||ch=='o') pellets.push({x,y,p:ch=='o'});
+  if(ch=='F') fruit={x,y};
+ }));
+ player.x=1;player.y=1;
+ ghosts[0].x=17;ghosts[0].y=1;
+ ghosts[1].x=17;ghosts[1].y=11;
+ ghosts[2].x=1;ghosts[2].y=11;
+ ghosts[3].x=9;ghosts[3].y=6;
+}
+resetBoard();
+function wall(x,y){
+ if(y<0||y>=map.length) return true;
+ if(x<0) return false;
+ if(x>=map[0].length) return false;
+ return map[y][x]=='#';
+}
+document.addEventListener('keydown',e=>{
+ if(e.key=='ArrowUp'||e.key=='w') {player.dx=0;player.dy=-1;}
+ if(e.key=='ArrowDown'||e.key=='s'){player.dx=0;player.dy=1;}
+ if(e.key=='ArrowLeft'||e.key=='a'){player.dx=-1;player.dy=0;}
+ if(e.key=='ArrowRight'||e.key=='d'){player.dx=1;player.dy=0;}
+});
+function beep(f,d){try{const a=new(window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator();o.frequency.value=f;o.connect(a.destination);o.start();o.stop(a.currentTime+d);}catch(e){}}
+function update(){
+ if(!started) return;
+ mouth=(mouth+1)%20;
+ let nx=player.x+player.dx, ny=player.y+player.dy;
+ if(nx<0) nx=18; if(nx>18) nx=0;
+ if(!wall(nx,ny)){player.x=nx;player.y=ny;}
+ pellets=pellets.filter(p=>{
+   if(p.x==player.x&&p.y==player.y){
+     score+=p.p?50:10;
+     if(p.p){power=300;beep(700,.08);}
+     else beep(500,.03);
+     return false;
+   }
+   return true;
+ });
+ if(fruit&&fruit.x==player.x&&fruit.y==player.y){score+=100;fruit=null;beep(900,.1);}
+ ghosts.forEach(g=>{
+   let dirs=[[1,0],[-1,0],[0,1],[0,-1]].filter(d=>!wall(g.x+d[0],g.y+d[1]));
+   dirs.sort((a,b)=>{
+      let da=Math.abs(player.x-(g.x+a[0]))+Math.abs(player.y-(g.y+a[1]));
+      let db=Math.abs(player.x-(g.x+b[0]))+Math.abs(player.y-(g.y+b[1]));
+      return power>0 ? db-da : da-db;
+   });
+   g.x+=dirs[0][0]; g.y+=dirs[0][1];
+   if(g.x==player.x&&g.y==player.y){
+      if(power>0){score+=200;g.x=9;g.y=6;beep(1000,.1);}
+      else{
+        lives--; beep(120,.2);
+        player.x=1;player.y=1;
+        if(lives<=0){started=false;alert("Game Over");}
+      }
+   }
+ });
+ if(power>0) power--;
+ document.getElementById('score').textContent='Puntos: '+score;
+ document.getElementById('lives').textContent='Vidas: '+lives;
+ if(pellets.length===0){started=false;alert('¡Ganaste!');}
+}
+function draw(){
+ ctx.clearRect(0,0,c.width,c.height);
+ map.forEach((r,y)=>[...r].forEach((ch,x)=>{
+   if(ch=='#'){ctx.fillStyle='#1e90ff';ctx.fillRect(x*T,y*T,T,T);}
+ }));
+ pellets.forEach(p=>{
+   ctx.fillStyle=p.p?'#ffb6c1':'#fff';
+   ctx.beginPath();ctx.arc(p.x*T+16,p.y*T+16,p.p?8:3,0,7);ctx.fill();
+ });
+ if(fruit){ctx.fillStyle='lime';ctx.beginPath();ctx.arc(fruit.x*T+16,fruit.y*T+16,8,0,7);ctx.fill();}
+ ghosts.forEach(g=>{
+   ctx.fillStyle=power>0?'blue':g.c;
+   ctx.beginPath();ctx.arc(g.x*T+16,g.y*T+16,14,Math.PI,0);ctx.lineTo(g.x*T+30,g.y*T+30);ctx.lineTo(g.x*T+2,g.y*T+30);ctx.fill();
+ });
+ ctx.fillStyle='yellow';
+ let a=(mouth<10?0.25:0.05)*Math.PI;
+ ctx.beginPath();
+ ctx.moveTo(player.x*T+16,player.y*T+16);
+ ctx.arc(player.x*T+16,player.y*T+16,14,a,2*Math.PI-a);
+ ctx.fill();
+ requestAnimationFrame(draw);
+}
+setInterval(update,180);
+draw();
+document.getElementById('start').onclick=()=>started=true;
+document.getElementById('restart').onclick=()=>{score=0;lives=3;power=0;resetBoard();started=true;};
+</script>
+</body>
+</html>
